@@ -5,11 +5,13 @@ from src.config import Config
 
 class TestConfig(unittest.TestCase):
     def setUp(self):
-        self.test_config_file = Path("test_mkdocs.yml")
+        self.test_config_file = Path("test_afmdocs.toml")
         with open(self.test_config_file, "w") as f:
             f.write("""
-            site_name: Test Site
-            docs_dir: docs
+            name = "afmdocs"
+            version = "0.1.0"
+            description = "A test package for pip configuration"
+            authors = ["Your Name <your.email@example.com>"]
             """)
 
     def tearDown(self):
@@ -17,14 +19,14 @@ class TestConfig(unittest.TestCase):
 
     def test_config_loading(self):
         config = Config(self.test_config_file)
-        self.assertEqual(config.get("site_name"), "Test Site")
-        self.assertEqual(config["docs_dir"], "docs")
-        self.assertIn("site_name", config)
+        self.assertEqual(config.get("name"), "afmdocs")
+        self.assertEqual(config["version"], "0.1.0")
+        self.assertIn("name", config)
         self.assertNotIn("non_existent_key", config)
 
     def test_missing_config_file(self):
         with self.assertRaises(FileNotFoundError):
-            Config("non_existent_file.yml")
+            Config("non_existent_file.toml")
 
 
 if __name__ == "__main__":

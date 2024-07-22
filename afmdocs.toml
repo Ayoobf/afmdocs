@@ -1,0 +1,6 @@
+
+name = "my-test-package"
+version = "0.1.0"
+description = "A test package for pip configuration"
+authors = ["Your Name <your.email@example.com>"]
+
