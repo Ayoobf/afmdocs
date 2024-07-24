@@ -10,17 +10,13 @@ class MarkdownProcessor:
             (r"^(#{1,6})\s(.+)$", self.process_headers)
         ]
 
-    """reads text, splits it up, and applies rules as needed
-    """
-
+    # reads text, splits it up, and applies rules as needed
     def process(self, text):
         lines = text.split("\n")
         processed_lines = [self.apply_rules(line) for line in lines]
         return "\n".join(processed_lines)
 
-    """applies the regex rules as defined above to each line
-    """
-
+    # applies the regex rules as defined above to each line
     def apply_rules(self, line):
         for pattern, handler in self.rules:
             match = re.match(pattern, line)

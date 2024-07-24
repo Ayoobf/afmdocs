@@ -7,12 +7,14 @@ class TestConfig(unittest.TestCase):
     def setUp(self):
         self.test_config_file = Path("test_afmdocs.toml")
         with open(self.test_config_file, "w") as f:
-            f.write("""
+            f.write(
+                """
             name = "afmdocs"
             version = "0.1.0"
             description = "A test package for pip configuration"
             authors = ["Your Name <your.email@example.com>"]
-            """)
+            """
+            )
 
     def tearDown(self):
         self.test_config_file.unlink()
