@@ -7,7 +7,11 @@ class MarkdownProcessor:
     def __init__(self):
         self.rules = [
             # Regex rules go here with form (regex, method)
-            (r"^(#{1,6})\s(.+)$", self.process_headers)
+            (r"^(#{1,6})\s(.+)$", self.process_headers),
+            (
+                r"(?<![^\n])\n?(?!#|\s*[-*+]|\s*\d+\.|\s*>)(.+?)(?:\n\n|\n?$)",  # what the fuck is this regex btw
+                self.process_paragraphs,
+            ),
         ]
 
     # reads text, splits it up, and applies rules as needed
@@ -30,8 +34,9 @@ class MarkdownProcessor:
         content = match.group(2)  # Header text
         return f"<h{level}>{content}</h{level}>"
 
-    def process_paragraphs(self, text):
-        pass
+    def process_paragraphs(self, match):
+        content = match.group(1)
+        return f"<p>{content}</p>"
 
     def process_bold(self, text):
         pass
@@ -108,11 +113,5 @@ class MarkdownProcessor:
 # Example usage
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Define input and output file paths
-    input_file = os.path.join(current_dir, "test.md")
-    output_file = os.path.join(current_dir, "output.html")
-
-    # Process the Markdown file
-    mdp.process_markdown_file(input_file, output_file)
+    hel = mdp.process("# Welcome to this chat \nHello")
+    print(hel)
