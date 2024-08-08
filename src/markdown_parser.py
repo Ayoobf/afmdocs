@@ -14,6 +14,7 @@ class MarkdownProcessor:
             ),
             (r"(\*\*([^\*\n]+)\*\*)|(\_\_([^\*\n]+)\_\_)", self.process_bold, 0),
             (r"(\*([^\*\n]+)\*)|(\_([^\*\n]+)\_)", self.process_italic, 0),
+            (r"`([^`\n]+)`", self.process_inline_code, 0),
             (r"```([\w-]+)?\n([\s\S]+?)\n```", self.process_fenced_code_block, 0),
             (r"((?:(?:^|\n)(?:    |\t).*)+)", self.process_indented_code_block, 0),
             (r"!\[([^\]]+)\]\(([^\)]+)\)", self.process_images, 0),
@@ -28,17 +29,51 @@ class MarkdownProcessor:
 
     # reads text, splits it up, and applies rules as needed
     def process(self, text):
-        # Pre-process the text to handle ordered lists
+        # Pre-process the text to handle tables, blockquotes, and lists
+        text = self.pre_process_tables(text)
         text = self.pre_process_blockquotes(text)
         text = self.pre_process_ordered_lists(text)
         text = self.pre_process_unordered_lists(text)
 
         # Process the rest of the text
         blocks = re.split(r"\n{2,}", text)
-        processed_blocks = [
-            self.apply_rules(block.strip()) for block in blocks if block.strip()
-        ]
+        processed_blocks = []
+        for block in blocks:
+            if block.strip():
+                if block.startswith("<table>") and block.endswith("</table>"):
+                    processed_blocks.append(block)
+                else:
+                    processed_blocks.append(self.apply_rules(block.strip()))
         return "\n\n".join(processed_blocks)
+
+    def pre_process_tables(self, text):
+        def process_table(match):
+            rows = match.group(0).strip().split("\n")
+            header = rows[0]
+            delimiter = rows[1]
+            body = rows[2:]
+
+            header_cells = [cell.strip() for cell in header.strip("|").split("|")]
+            header_html = (
+                "<thead><tr>"
+                + "".join(f"<th>{cell}</th>" for cell in header_cells)
+                + "</tr></thead>"
+            )
+
+            body_html = "<tbody>"
+            for row in body:
+                cells = [cell.strip() for cell in row.strip("|").split("|")]
+                if len(cells) == len(header_cells):
+                    body_html += (
+                        "<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>"
+                    )
+            body_html += "</tbody>"
+
+            return f"<table>\n{header_html}\n{body_html}\n</table>"
+
+        # Pattern to match Markdown tables
+        pattern = r"^\|(.+\|)+\n\|(?:[-:| ]+\|)+\n((?:\|(?:.+\|)+\n?)+)"
+        return re.sub(pattern, process_table, text, flags=re.MULTILINE)
 
     def pre_process_ordered_lists(self, text):
         def replace_list(match):
@@ -113,6 +148,9 @@ class MarkdownProcessor:
         code = re.sub(r"(?:^|\n)(    |\t)", "\n", code)
         return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
 
+    def process_inline_code(self, match):
+        return f"<code>{self.escape_html(match.group(1))}</code>"
+
     # Links and images
     def process_links(self, match):
         link_text = match.group(1)
@@ -124,9 +162,6 @@ class MarkdownProcessor:
         image_url = match.group(2)
 
         return f'<img src="{self.escape_html(image_url)}" alt="{self.escape_html(alt_text)}">'
-
-    def process_code_blocks(self, text):
-        pass
 
     # Tables
     def process_tables(self, text):
@@ -172,31 +207,16 @@ class MarkdownProcessor:
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
     markdown_text = """
-# Blockquote Example
+# Table Example
 
-Here's a simple blockquote:
+Here's a simple table:
 
-> This is a blockquote.
-> It can span multiple lines.
+| Header 1 | Header 2 | Header 3 |
+|----------|----------|----------|
+| Row 1, Col 1 | Row 1, Col 2 | Row 1, Col 3 |
+| Row 2, Col 1 | Row 2, Col 2 | Row 2, Col 3 |
+| Row 3, Col 1 | Row 3, Col 2 | Row 3, Col 3 |
 
-You can also have nested blockquotes:
-
-> This is the first level of quoting.
->
-> > This is nested blockquote.
->
-> Back to the first level.
-
-Blockquotes can contain other Markdown elements:
-
-> ## This is a header.
-> 
-> 1. This is the first list item.
-> 2. This is the second list item.
->
-> Here's some example code:
->
->     return shell_exec("echo $input | $markdown_script");
 """
     html_output = mdp.process(markdown_text)
     print(html_output)
