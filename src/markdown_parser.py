@@ -13,6 +13,8 @@ class MarkdownProcessor:
             ),
             (r"(\*\*([^\*\n]+)\*\*)|(\_\_([^\*\n]+)\_\_)", self.process_bold),
             (r"(\*([^\*\n]+)\*)|(\_([^\*\n]+)\_)", self.process_italic),
+            (r"```([\w-]+)?\n([\s\S]+?)\n```", self.process_fenced_code_block),
+            (r"((?:(?:^|\n)(?:    |\t).*)+)", self.process_indented_code_block),
             (
                 r"(?<![^\n])\n?(?!#|\s*[-*+]|\s*\d+\.|\s*>)(.+?)(?:\n\n|\n?$)",  # what the fuck is this regex btw
                 self.process_paragraphs,
@@ -21,15 +23,17 @@ class MarkdownProcessor:
 
     # reads text, splits it up, and applies rules as needed
     def process(self, text):
-        lines = text.split("\n")
-        processed_lines = [self.apply_rules(line) for line in lines]
-        return "\n".join(processed_lines)
+        return re.sub(
+            r"(?:^|\n\n)([\s\S]+?)(?:\n\n|$)",
+            lambda m: self.apply_rules(m.group(1)),
+            text,
+        )
 
     # applies the regex rules as defined above to each line
-    def apply_rules(self, line):
+    def apply_rules(self, block):
         for pattern, handler in self.rules:
-            line = re.sub(pattern, lambda m: handler(m), line)
-        return line
+            block = re.sub(pattern, handler, block, flags=re.MULTILINE)
+        return block
 
     # Basic Markdown elements
     def process_headers(self, match):
@@ -53,8 +57,16 @@ class MarkdownProcessor:
         content = match.group(2) or match.group(4)  # Get content from either *** or ___
         return f"<strong><em>{content}</em></strong>"
 
-    def process_code(self, text):
-        pass
+    def process_fenced_code_block(self, match):
+        language = match.group(1) or ""
+        code = match.group(2)
+        return f'<pre><code class="language-{language}">{self.escape_html(code)}</code></pre>'
+
+    def process_indented_code_block(self, match):
+        code = match.group(1)
+        # Remove the indentation
+        code = re.sub(r"(?:^|\n)(    |\t)", "\n", code)
+        return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
 
     # Lists
     def process_unordered_list(self, text):
@@ -92,9 +104,14 @@ class MarkdownProcessor:
     def process_footnotes(self, text):
         pass
 
-    # Utility methods
     def escape_html(self, text):
-        pass
+        return (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#39;")
+        )
 
     def unescape_html(self, text):
         pass
@@ -122,5 +139,21 @@ class MarkdownProcessor:
 # Example usage
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
-    hel = mdp.process("**Bold** and *italic* and ***bold italic***")
-    print(hel)
+    markdown_text = """
+# Code Blocks Example
+
+Here's a Python code block:
+
+```python
+def hello_world():
+    print("Hello, World!")
+```
+
+And here's an indented code block:
+
+    This is an
+    indented code block
+    without language specification
+"""
+    html_output = mdp.process(markdown_text)
+    print(html_output)
