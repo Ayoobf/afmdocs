@@ -3,7 +3,6 @@ import sys
 
 
 class MarkdownProcessor:
-
     def __init__(self):
         self.rules = [
             (r"^(#{1,6})\s(.+)$", self.process_headers, re.MULTILINE),
@@ -30,11 +29,80 @@ class MarkdownProcessor:
                 0,
             ),
         ]
-        self.list_item_count = 0
 
-    # Horizontal rules
+    def process(self, text):
+        # Pre-process the text to handle tables, blockquotes, and lists
+        text = self.pre_process_tables(text)
+        text = self.pre_process_blockquotes(text)
+        text = self.pre_process_ordered_lists(text)
+        text = self.pre_process_unordered_lists(text)
+
+        # Process the rest of the text
+        blocks = re.split(r"\n{2,}", text)
+        processed_blocks = []
+        for block in blocks:
+            if block.strip():
+                if block.startswith("<table>") and block.endswith("</table>"):
+                    processed_blocks.append(block)
+                elif re.match(r"^(?:(?:\*{3,})|(?:-{3,})|(?:_{3,}))$", block):
+                    processed_blocks.append(self.process_horizontal_rules(block))
+                else:
+                    processed_blocks.append(self.apply_rules(block.strip()))
+        return "\n\n".join(processed_blocks)
+
+    def apply_rules(self, block):
+        for pattern, handler, flags in self.rules:
+            block = re.sub(pattern, handler, block, flags=flags)
+        return block
+
+    def process_headers(self, match):
+        level = len(match.group(1))
+        content = match.group(2)
+        return f"<h{level}>{content}</h{level}>"
+
+    def process_paragraphs(self, match):
+        content = match.group(1)
+        if re.match(r"<\w+[^>]*>", content):
+            return content
+        return f"<p>{content}</p>"
+
+    def process_bold(self, match):
+        content = match.group(2) or match.group(4)
+        return f"<strong>{content}</strong>"
+
+    def process_italic(self, match):
+        content = match.group(2) or match.group(4)
+        return f"<em>{content}</em>"
+
+    def process_bold_italic(self, match):
+        content = match.group(2) or match.group(4)
+        return f"<strong><em>{content}</em></strong>"
+
+    def process_inline_code(self, match):
+        return f"<code>{self.escape_html(match.group(1))}</code>"
+
+    def process_fenced_code_block(self, match):
+        language = match.group(1) or ""
+        code = match.group(2)
+        return f'<pre><code class="language-{language}">{self.escape_html(code)}</code></pre>'
+
+    def process_indented_code_block(self, match):
+        code = match.group(1)
+        code = re.sub(r"(?:^|\n)(    |\t)", "\n", code)
+        return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
+
+    def process_links(self, match):
+        link_text = match.group(1)
+        link_url = self.escape_html(match.group(2))
+        return f'<a href="{link_url}">{link_text}</a>'
+
+    def process_images(self, match):
+        alt_text = self.escape_html(match.group(1))
+        image_url = self.escape_html(match.group(2))
+        return f'<img src="{image_url}" alt="{alt_text}">'
+
     def process_horizontal_rules(self, match):
-        return "<hr>"  # simple lol
+        return "<hr>"
 
     def pre_process_tables(self, text):
         def process_table(match):
@@ -60,7 +128,6 @@ class MarkdownProcessor:
 
             return f"<table>\n{header_html}\n{body_html}\n</table>"
 
-        # Pattern to match Markdown tables
         pattern = r"^\|(.+\|)+\n\|(?:[-:| ]+\|)+\n((?:\|(?:.+\|)+\n?)+)"
         return re.sub(pattern, process_table, text, flags=re.MULTILINE)
 
@@ -80,7 +147,7 @@ class MarkdownProcessor:
             items = re.findall(
                 r"^[-*+]\s(.+(?:\n(?![-*+]\s).*)*)", match.group(0), re.MULTILINE
             )
-            if not items:  # If no items found, don't create an empty list
+            if not items:
                 return match.group(0)
             processed_items = [f"<li>{item.strip()}</li>" for item in items]
             return f"<ul>\n{''.join(processed_items)}\n</ul>"
@@ -97,84 +164,6 @@ class MarkdownProcessor:
         pattern = r"((?:^>.*\n?)+)"
         return re.sub(pattern, replace_blockquote, text, flags=re.MULTILINE)
 
-    # reads text, splits it up, and applies rules as needed
-    def process(self, text):
-        # Pre-process the text to handle tables, blockquotes, and lists
-        text = self.pre_process_tables(text)
-        text = self.pre_process_blockquotes(text)
-        text = self.pre_process_ordered_lists(text)
-        text = self.pre_process_unordered_lists(text)
-
-        # Process the rest of the text
-        blocks = re.split(r"\n{2,}", text)
-        processed_blocks = []
-        for block in blocks:
-            if block.strip():
-                if block.startswith("<table>") and block.endswith("</table>"):
-                    processed_blocks.append(block)
-                elif re.match(r"^(?:(?:\*{3,})|(?:-{3,})|(?:_{3,}))$", block):
-                    processed_blocks.append(self.process_horizontal_rules(block))
-                else:
-                    processed_blocks.append(self.apply_rules(block.strip()))
-        return "\n\n".join(processed_blocks)
-
-    # applies the regex rules as defined above to each line
-    def apply_rules(self, block):
-        for pattern, handler, flags in self.rules:
-            block = re.sub(pattern, handler, block, flags=flags)
-        return block
-
-    # Basic Markdown elements
-    def process_headers(self, match):
-        level = len(match.group(1))  # Number of '#' symbols
-        content = match.group(2)  # Header text
-        return f"<h{level}>{content}</h{level}>"
-
-    def process_paragraphs(self, match):
-        content = match.group(1)
-        # Don't wrap content in <p> tags if it's already wrapped in other tags
-        if re.match(r"<\w+[^>]*>", content):
-            return content
-        return f"<p>{content}</p>"
-
-    def process_bold(self, match):
-        content = match.group(2) or match.group(4)  # Get content from either ** or __
-        return f"<strong>{content}</strong>"
-
-    def process_italic(self, match):
-        content = match.group(2) or match.group(4)  # Get content from either * or _
-        return f"<em>{content}</em>"
-
-    def process_bold_italic(self, match):
-        content = match.group(2) or match.group(4)  # Get content from either *** or ___
-        return f"<strong><em>{content}</em></strong>"
-
-    def process_fenced_code_block(self, match):
-        language = match.group(1) or ""
-        code = match.group(2)
-        return f'<pre><code class="language-{language}">{self.escape_html(code)}</code></pre>'
-
-    def process_indented_code_block(self, match):
-        code = match.group(1)
-        # Remove the indentation
-        code = re.sub(r"(?:^|\n)(    |\t)", "\n", code)
-        return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
-
-    def process_inline_code(self, match):
-        return f"<code>{self.escape_html(match.group(1))}</code>"
-
-    # Links and images
-    def process_links(self, match):
-        link_text = match.group(1)
-        link_url = match.group(2)
-        return f'<a href="{self.escape_html(link_url)}">{link_text}</a>'
-
-    def process_images(self, match):
-        alt_text = match.group(1)
-        image_url = match.group(2)
-
-        return f'<img src="{self.escape_html(image_url)}" alt="{self.escape_html(alt_text)}">'
-
     def escape_html(self, text):
         return (
             text.replace("&", "&amp;")
@@ -184,22 +173,12 @@ class MarkdownProcessor:
             .replace("'", "&#39;")
         )
 
-    def unescape_html(self, text):
-        pass
-
-    """reads the target markdown file and starts processing the output
-    """
-
-    # This method might just be an internal helper method for testing
     def process_markdown_file(self, input_path, output_path):
-        # Read the input Markdown file
         with open(input_path, "r", encoding="utf-8") as file:
             markdown_content = file.read()
 
-        # Process the Markdown content
         html_content = self.process(markdown_content)
 
-        # Write the processed content to an HTML file
         with open(output_path, "w", encoding="utf-8") as file:
             file.write(html_content)
 
@@ -207,7 +186,6 @@ class MarkdownProcessor:
         sys.stdout.flush()
 
 
-# Example usage
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
     markdown_text = """
