@@ -1,4 +1,3 @@
-import os
 from string import Template
 from pathlib import Path
 
@@ -31,7 +30,7 @@ class TemplateEngine:
                 <h1>${site_name}</h1>
             </header>
             <main>
-                ${content}
+                ${content}c
             </main>
             <footer>
                 <p>&copy; ${site_name}</p>
