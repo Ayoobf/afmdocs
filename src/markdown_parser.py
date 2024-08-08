@@ -29,6 +29,7 @@ class MarkdownProcessor:
     # reads text, splits it up, and applies rules as needed
     def process(self, text):
         # Pre-process the text to handle ordered lists
+        text = self.pre_process_blockquotes(text)
         text = self.pre_process_ordered_lists(text)
         text = self.pre_process_unordered_lists(text)
 
@@ -60,6 +61,15 @@ class MarkdownProcessor:
 
         pattern = r"(?:^[-*+].*(?:\n(?!\s*\n|[-*+]).*)*\n?)+"
         return re.sub(pattern, replace_list, text, flags=re.MULTILINE)
+
+    def pre_process_blockquotes(self, text):
+        def replace_blockquote(match):
+            content = match.group(1).replace("\n>", "\n").strip()
+            processed_content = self.apply_rules(content)
+            return f"<blockquote>\n{processed_content}\n</blockquote>"
+
+        pattern = r"((?:^>.*\n?)+)"
+        return re.sub(pattern, replace_blockquote, text, flags=re.MULTILINE)
 
     # applies the regex rules as defined above to each line
     def apply_rules(self, block):
@@ -115,10 +125,6 @@ class MarkdownProcessor:
 
         return f'<img src="{self.escape_html(image_url)}" alt="{self.escape_html(alt_text)}">'
 
-    # Block elements
-    def process_blockquotes(self, text):
-        pass
-
     def process_code_blocks(self, text):
         pass
 
@@ -166,7 +172,31 @@ class MarkdownProcessor:
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
     markdown_text = """
-![Duck Duck Go](https://mdg.imgix.net/assets/images/san-juan-mountains.jpg?auto=format&fit=clip&q=40&w=1080).
+# Blockquote Example
+
+Here's a simple blockquote:
+
+> This is a blockquote.
+> It can span multiple lines.
+
+You can also have nested blockquotes:
+
+> This is the first level of quoting.
+>
+> > This is nested blockquote.
+>
+> Back to the first level.
+
+Blockquotes can contain other Markdown elements:
+
+> ## This is a header.
+> 
+> 1. This is the first list item.
+> 2. This is the second list item.
+>
+> Here's some example code:
+>
+>     return shell_exec("echo $input | $markdown_script");
 """
     html_output = mdp.process(markdown_text)
     print(html_output)
