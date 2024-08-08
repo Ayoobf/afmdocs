@@ -16,6 +16,7 @@ class MarkdownProcessor:
             (r"(\*([^\*\n]+)\*)|(\_([^\*\n]+)\_)", self.process_italic, 0),
             (r"```([\w-]+)?\n([\s\S]+?)\n```", self.process_fenced_code_block, 0),
             (r"((?:(?:^|\n)(?:    |\t).*)+)", self.process_indented_code_block, 0),
+            (r"!\[([^\]]+)\]\(([^\)]+)\)", self.process_images, 0),
             (r"\[([^\]]+)\]\(([^\)]+)\)", self.process_links, 0),
             (
                 r"(?<![^\n])\n?(?!#|\s*[-*+]|\s*\d+\.|\s*>)(.+?)(?:\n\n|\n?$)",
@@ -108,8 +109,11 @@ class MarkdownProcessor:
         link_url = match.group(2)
         return f'<a href="{self.escape_html(link_url)}">{link_text}</a>'
 
-    def process_images(self, text):
-        pass
+    def process_images(self, match):
+        alt_text = match.group(1)
+        image_url = match.group(2)
+
+        return f'<img src="{self.escape_html(image_url)}" alt="{self.escape_html(alt_text)}">'
 
     # Block elements
     def process_blockquotes(self, text):
@@ -124,13 +128,6 @@ class MarkdownProcessor:
 
     # Horizontal rules
     def process_horizontal_rules(self, text):
-        pass
-
-    # MkDocs-specific elements
-    def process_admonitions(self, text):
-        pass
-
-    def process_footnotes(self, text):
         pass
 
     def escape_html(self, text):
@@ -169,7 +166,7 @@ class MarkdownProcessor:
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
     markdown_text = """
-[Duck Duck Go](https://duckduckgo.com).
+![Duck Duck Go](https://mdg.imgix.net/assets/images/san-juan-mountains.jpg?auto=format&fit=clip&q=40&w=1080).
 """
     html_output = mdp.process(markdown_text)
     print(html_output)
