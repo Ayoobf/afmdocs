@@ -1,5 +1,4 @@
 import re
-import os
 import sys
 
 
@@ -8,6 +7,12 @@ class MarkdownProcessor:
         self.rules = [
             # Regex rules go here with form (regex, method)
             (r"^(#{1,6})\s(.+)$", self.process_headers),
+            (
+                r"(\*\*\*([^\*\n]+)\*\*\*)|(\_\_\_([^\*\n]+)\_\_\_)",
+                self.process_bold_italic,
+            ),
+            (r"(\*\*([^\*\n]+)\*\*)|(\_\_([^\*\n]+)\_\_)", self.process_bold),
+            (r"(\*([^\*\n]+)\*)|(\_([^\*\n]+)\_)", self.process_italic),
             (
                 r"(?<![^\n])\n?(?!#|\s*[-*+]|\s*\d+\.|\s*>)(.+?)(?:\n\n|\n?$)",  # what the fuck is this regex btw
                 self.process_paragraphs,
@@ -23,10 +28,8 @@ class MarkdownProcessor:
     # applies the regex rules as defined above to each line
     def apply_rules(self, line):
         for pattern, handler in self.rules:
-            match = re.match(pattern, line)
-            if match:
-                return handler(match)
-        return line  # Return the line unchanged if no rules match
+            line = re.sub(pattern, lambda m: handler(m), line)
+        return line
 
     # Basic Markdown elements
     def process_headers(self, match):
@@ -38,11 +41,17 @@ class MarkdownProcessor:
         content = match.group(1)
         return f"<p>{content}</p>"
 
-    def process_bold(self, text):
-        pass
+    def process_bold(self, match):
+        content = match.group(2) or match.group(4)  # Get content from either ** or __
+        return f"<strong>{content}</strong>"
 
-    def process_italic(self, text):
-        pass
+    def process_italic(self, match):
+        content = match.group(2) or match.group(4)  # Get content from either * or _
+        return f"<em>{content}</em>"
+
+    def process_bold_italic(self, match):
+        content = match.group(2) or match.group(4)  # Get content from either *** or ___
+        return f"<strong><em>{content}</em></strong>"
 
     def process_code(self, text):
         pass
@@ -113,5 +122,5 @@ class MarkdownProcessor:
 # Example usage
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
-    hel = mdp.process("# Welcome to this chat \nHello")
+    hel = mdp.process("**Bold** and *italic* and ***bold italic***")
     print(hel)
