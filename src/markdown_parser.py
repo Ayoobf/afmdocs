@@ -28,6 +28,7 @@ class MarkdownProcessor:
     def process(self, text):
         # Pre-process the text to handle ordered lists
         text = self.pre_process_ordered_lists(text)
+        text = self.pre_process_unordered_lists(text)
 
         # Process the rest of the text
         blocks = re.split(r"\n{2,}", text)
@@ -45,6 +46,17 @@ class MarkdownProcessor:
             return f"<ol>\n{''.join(processed_items)}\n</ol>"
 
         pattern = r"(?:^\d+\..*(?:\n(?!\s*\n|\d+\.).*)*\n?)+"
+        return re.sub(pattern, replace_list, text, flags=re.MULTILINE)
+
+    def pre_process_unordered_lists(self, text):
+        def replace_list(match):
+            items = re.findall(
+                r"^[-*+]\s(.+(?:\n(?![-*+]\s).*)*)", match.group(0), re.MULTILINE
+            )
+            processed_items = [f"<li>{item.strip()}</li>" for item in items]
+            return f"<ul>\n{''.join(processed_items)}\n</ul>"
+
+        pattern = r"(?:^[-*+].*(?:\n(?!\s*\n|[-*+]).*)*\n?)+"
         return re.sub(pattern, replace_list, text, flags=re.MULTILINE)
 
     # applies the regex rules as defined above to each line
@@ -90,8 +102,10 @@ class MarkdownProcessor:
         return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
 
     # Lists
-    def process_unordered_list(self, text):
-        pass
+    def process_unordered_list(self, list_text):
+        items = re.findall(r"^[-*+]\s(.+(?:\n(?![-*+]\s).*)*)", list_text, re.MULTILINE)
+        processed_items = [f"<li>{item.strip()}</li>" for item in items]
+        return f"<ul>\n{''.join(processed_items)}\n</ul>"
 
     def process_ordered_list_item(self, match):
         self.list_item_count += 1
@@ -171,10 +185,30 @@ if __name__ == "__main__":
     mdp = MarkdownProcessor()
     markdown_text = """
 
+# Lists Example
+
+Ordered list:
+
 1. First item
 2. Second item
    with a line break
-4. Fourth item
+3. Third item
+
+Unordered list:
+
+* First item
+* Second item
+  with a line break
++ Third item
+- Fourth item
+
+Mixed list:
+
+1. First ordered item
+2. Second ordered item
+   * Unordered sub-item
+   * Another unordered sub-item
+3. Third ordered item
 """
     html_output = mdp.process(markdown_text)
     print(html_output)
