@@ -101,24 +101,6 @@ class MarkdownProcessor:
         code = re.sub(r"(?:^|\n)(    |\t)", "\n", code)
         return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
 
-    # Lists
-    def process_unordered_list(self, list_text):
-        items = re.findall(r"^[-*+]\s(.+(?:\n(?![-*+]\s).*)*)", list_text, re.MULTILINE)
-        processed_items = [f"<li>{item.strip()}</li>" for item in items]
-        return f"<ul>\n{''.join(processed_items)}\n</ul>"
-
-    def process_ordered_list_item(self, match):
-        self.list_item_count += 1
-        indent = match.group(1)
-        content = match.group(2)
-        # Process the content of the list item
-        processed_content = self.apply_rules(content)
-        # Remove any trailing newlines and add indentation
-        processed_content = processed_content.rstrip().replace(
-            "\n", "\n" + " " * len(indent)
-        )
-        return f"<li>{processed_content}</li>"
-
     # Links and images
     def process_links(self, text):
         pass
