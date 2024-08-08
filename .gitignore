@@ -369,3 +369,5 @@ tags
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/python,pythonvanilla,git,visualstudiocode,intellij,vim
+src/test.md
+src/output.html
