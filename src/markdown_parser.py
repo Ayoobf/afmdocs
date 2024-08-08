@@ -1,5 +1,11 @@
 import re
-import sys
+import logging
+
+
+class MarkdownProcessingError(Exception):
+    """Custom exception for Markdown processing errors."""
+
+    pass
 
 
 class MarkdownProcessor:
@@ -29,36 +35,60 @@ class MarkdownProcessor:
                 0,
             ),
         ]
+        self.logger = self._setup_logger()
+
+    def _setup_logger(self):
+        logger = logging.getLogger("MarkdownProcessor")
+        logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return logger
 
     def process(self, text):
-        # Pre-process the text to handle tables, blockquotes, and lists
-        text = self.pre_process_tables(text)
-        text = self.pre_process_blockquotes(text)
-        text = self.pre_process_ordered_lists(text)
-        text = self.pre_process_unordered_lists(text)
+        try:
+            self.logger.info("Starting Markdown processing")
+            text = self.pre_process_tables(text)
+            text = self.pre_process_blockquotes(text)
+            text = self.pre_process_ordered_lists(text)
+            text = self.pre_process_unordered_lists(text)
 
-        # Process the rest of the text
-        blocks = re.split(r"\n{2,}", text)
-        processed_blocks = []
-        for block in blocks:
-            if block.strip():
-                if block.startswith("<table>") and block.endswith("</table>"):
-                    processed_blocks.append(block)
-                elif re.match(r"^(?:(?:\*{3,})|(?:-{3,})|(?:_{3,}))$", block):
-                    processed_blocks.append(self.process_horizontal_rules(block))
-                else:
-                    processed_blocks.append(self.apply_rules(block.strip()))
-        return "\n\n".join(processed_blocks)
+            blocks = re.split(r"\n{2,}", text)
+            processed_blocks = []
+            for block in blocks:
+                if block.strip():
+                    if block.startswith("<table>") and block.endswith("</table>"):
+                        processed_blocks.append(block)
+                    elif re.match(r"^(?:(?:\*{3,})|(?:-{3,})|(?:_{3,}))$", block):
+                        processed_blocks.append(self.process_horizontal_rules(block))
+                    else:
+                        processed_blocks.append(self.apply_rules(block.strip()))
+            self.logger.info("Markdown processing completed successfully")
+            return "\n\n".join(processed_blocks)
+        except Exception as e:
+            self.logger.error(f"An error occurred during Markdown processing: {str(e)}")
+            raise MarkdownProcessingError(f"Failed to process Markdown: {str(e)}")
 
     def apply_rules(self, block):
-        for pattern, handler, flags in self.rules:
-            block = re.sub(pattern, handler, block, flags=flags)
-        return block
+        try:
+            for pattern, handler, flags in self.rules:
+                block = re.sub(pattern, handler, block, flags=flags)
+            return block
+        except Exception as e:
+            self.logger.error(f"Error applying rules to block: {str(e)}")
+            raise MarkdownProcessingError(f"Failed to apply rules: {str(e)}")
 
     def process_headers(self, match):
-        level = len(match.group(1))
-        content = match.group(2)
-        return f"<h{level}>{content}</h{level}>"
+        try:
+            level = len(match.group(1))
+            content = match.group(2)
+            return f"<h{level}>{content}</h{level}>"
+        except Exception as e:
+            self.logger.error(f"Error processing header: {str(e)}")
+            return match.group(0)  # Return original text if processing fails
 
     def process_paragraphs(self, match):
         content = match.group(1)
@@ -105,31 +135,38 @@ class MarkdownProcessor:
         return "<hr>"
 
     def pre_process_tables(self, text):
-        def process_table(match):
-            rows = match.group(0).strip().split("\n")
-            header = rows[0]
-            body = rows[2:]
+        try:
 
-            header_cells = [cell.strip() for cell in header.strip("|").split("|")]
-            header_html = (
-                "<thead><tr>"
-                + "".join(f"<th>{cell}</th>" for cell in header_cells)
-                + "</tr></thead>"
-            )
+            def process_table(match):
+                rows = match.group(0).strip().split("\n")
+                header = rows[0]
+                body = rows[2:]
 
-            body_html = "<tbody>"
-            for row in body:
-                cells = [cell.strip() for cell in row.strip("|").split("|")]
-                if len(cells) == len(header_cells):
-                    body_html += (
-                        "<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>"
-                    )
-            body_html += "</tbody>"
+                header_cells = [cell.strip() for cell in header.strip("|").split("|")]
+                header_html = (
+                    "<thead><tr>"
+                    + "".join(f"<th>{cell}</th>" for cell in header_cells)
+                    + "</tr></thead>"
+                )
 
-            return f"<table>\n{header_html}\n{body_html}\n</table>"
+                body_html = "<tbody>"
+                for row in body:
+                    cells = [cell.strip() for cell in row.strip("|").split("|")]
+                    if len(cells) == len(header_cells):
+                        body_html += (
+                            "<tr>"
+                            + "".join(f"<td>{cell}</td>" for cell in cells)
+                            + "</tr>"
+                        )
+                body_html += "</tbody>"
 
-        pattern = r"^\|(.+\|)+\n\|(?:[-:| ]+\|)+\n((?:\|(?:.+\|)+\n?)+)"
-        return re.sub(pattern, process_table, text, flags=re.MULTILINE)
+                return f"<table>\n{header_html}\n{body_html}\n</table>"
+
+            pattern = r"^\|(.+\|)+\n\|(?:[-:| ]+\|)+\n((?:\|(?:.+\|)+\n?)+)"
+            return re.sub(pattern, process_table, text, flags=re.MULTILINE)
+        except Exception as e:
+            self.logger.error(f"Error pre-processing tables: {str(e)}")
+            return text  # Return original text if processing fails
 
     def pre_process_ordered_lists(self, text):
         def replace_list(match):
@@ -165,44 +202,51 @@ class MarkdownProcessor:
         return re.sub(pattern, replace_blockquote, text, flags=re.MULTILINE)
 
     def escape_html(self, text):
-        return (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace('"', "&quot;")
-            .replace("'", "&#39;")
-        )
+        try:
+            return (
+                text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&#39;")
+            )
+        except Exception as e:
+            self.logger.error(f"Error escaping HTML: {str(e)}")
+            return text  # Return original text if escaping fails
 
     def process_markdown_file(self, input_path, output_path):
-        with open(input_path, "r", encoding="utf-8") as file:
-            markdown_content = file.read()
+        try:
+            with open(input_path, "r", encoding="utf-8") as file:
+                markdown_content = file.read()
 
-        html_content = self.process(markdown_content)
+            html_content = self.process(markdown_content)
 
-        with open(output_path, "w", encoding="utf-8") as file:
-            file.write(html_content)
+            with open(output_path, "w", encoding="utf-8") as file:
+                file.write(html_content)
 
-        sys.stdout.write(f"Processed {input_path} and saved result to {output_path}\n")
-        sys.stdout.flush()
+            self.logger.info(
+                f"Processed {input_path} and saved result to {output_path}"
+            )
+        except IOError as e:
+            self.logger.error(f"IO error occurred: {str(e)}")
+            raise MarkdownProcessingError(f"Failed to process file: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"An unexpected error occurred: {str(e)}")
+            raise MarkdownProcessingError(
+                f"Unexpected error during file processing: {str(e)}"
+            )
 
 
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
-    markdown_text = """
-# Table Example
+    try:
+        with open("error_test_cases.md", "r", encoding="utf-8") as file:
+            markdown_text = file.read()
 
-Here's a simple table:
+        html_output = mdp.process(markdown_text)
+        print(html_output)
 
-| Header 1 | Header 2 | Header 3 |
-|----------|----------|----------|
-| Row 1, Col 1 | Row 1, Col 2 | Row 1, Col 3 |
-| Row 2, Col 1 | Row 2, Col 2 | Row 2, Col 3 |
-| Row 3, Col 1 | Row 3, Col 2 | Row 3, Col 3 |
-
----
-
-And here's some text after a horizontal rule.
-
-"""
-    html_output = mdp.process(markdown_text)
-    print(html_output)
+    except MarkdownProcessingError as e:
+        print(f"Error processing Markdown: {str(e)}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {str(e)}")
