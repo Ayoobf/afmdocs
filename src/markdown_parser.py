@@ -16,6 +16,7 @@ class MarkdownProcessor:
             (r"(\*([^\*\n]+)\*)|(\_([^\*\n]+)\_)", self.process_italic, 0),
             (r"```([\w-]+)?\n([\s\S]+?)\n```", self.process_fenced_code_block, 0),
             (r"((?:(?:^|\n)(?:    |\t).*)+)", self.process_indented_code_block, 0),
+            (r"\[([^\]]+)\]\(([^\)]+)\)", self.process_links, 0),
             (
                 r"(?<![^\n])\n?(?!#|\s*[-*+]|\s*\d+\.|\s*>)(.+?)(?:\n\n|\n?$)",
                 self.process_paragraphs,
@@ -102,8 +103,10 @@ class MarkdownProcessor:
         return f"<pre><code>{self.escape_html(code.strip())}</code></pre>"
 
     # Links and images
-    def process_links(self, text):
-        pass
+    def process_links(self, match):
+        link_text = match.group(1)
+        link_url = match.group(2)
+        return f'<a href="{self.escape_html(link_url)}">{link_text}</a>'
 
     def process_images(self, text):
         pass
@@ -166,31 +169,7 @@ class MarkdownProcessor:
 if __name__ == "__main__":
     mdp = MarkdownProcessor()
     markdown_text = """
-
-# Lists Example
-
-Ordered list:
-
-1. First item
-2. Second item
-   with a line break
-3. Third item
-
-Unordered list:
-
-* First item
-* Second item
-  with a line break
-+ Third item
-- Fourth item
-
-Mixed list:
-
-1. First ordered item
-2. Second ordered item
-   * Unordered sub-item
-   * Another unordered sub-item
-3. Third ordered item
+[Duck Duck Go](https://duckduckgo.com).
 """
     html_output = mdp.process(markdown_text)
     print(html_output)
