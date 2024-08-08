@@ -20,6 +20,11 @@ class MarkdownProcessor:
             (r"!\[([^\]]+)\]\(([^\)]+)\)", self.process_images, 0),
             (r"\[([^\]]+)\]\(([^\)]+)\)", self.process_links, 0),
             (
+                r"^(?:(?:\*{3,})|(?:-{3,})|(?:_{3,}))$",
+                self.process_horizontal_rules,
+                re.MULTILINE,
+            ),
+            (
                 r"(?<![^\n])\n?(?!#|\s*[-*+]|\s*\d+\.|\s*>)(.+?)(?:\n\n|\n?$)",
                 self.process_paragraphs,
                 0,
@@ -27,30 +32,14 @@ class MarkdownProcessor:
         ]
         self.list_item_count = 0
 
-    # reads text, splits it up, and applies rules as needed
-    def process(self, text):
-        # Pre-process the text to handle tables, blockquotes, and lists
-        text = self.pre_process_tables(text)
-        text = self.pre_process_blockquotes(text)
-        text = self.pre_process_ordered_lists(text)
-        text = self.pre_process_unordered_lists(text)
-
-        # Process the rest of the text
-        blocks = re.split(r"\n{2,}", text)
-        processed_blocks = []
-        for block in blocks:
-            if block.strip():
-                if block.startswith("<table>") and block.endswith("</table>"):
-                    processed_blocks.append(block)
-                else:
-                    processed_blocks.append(self.apply_rules(block.strip()))
-        return "\n\n".join(processed_blocks)
+    # Horizontal rules
+    def process_horizontal_rules(self, match):
+        return "<hr>"  # simple lol
 
     def pre_process_tables(self, text):
         def process_table(match):
             rows = match.group(0).strip().split("\n")
             header = rows[0]
-            delimiter = rows[1]
             body = rows[2:]
 
             header_cells = [cell.strip() for cell in header.strip("|").split("|")]
@@ -91,6 +80,8 @@ class MarkdownProcessor:
             items = re.findall(
                 r"^[-*+]\s(.+(?:\n(?![-*+]\s).*)*)", match.group(0), re.MULTILINE
             )
+            if not items:  # If no items found, don't create an empty list
+                return match.group(0)
             processed_items = [f"<li>{item.strip()}</li>" for item in items]
             return f"<ul>\n{''.join(processed_items)}\n</ul>"
 
@@ -105,6 +96,27 @@ class MarkdownProcessor:
 
         pattern = r"((?:^>.*\n?)+)"
         return re.sub(pattern, replace_blockquote, text, flags=re.MULTILINE)
+
+    # reads text, splits it up, and applies rules as needed
+    def process(self, text):
+        # Pre-process the text to handle tables, blockquotes, and lists
+        text = self.pre_process_tables(text)
+        text = self.pre_process_blockquotes(text)
+        text = self.pre_process_ordered_lists(text)
+        text = self.pre_process_unordered_lists(text)
+
+        # Process the rest of the text
+        blocks = re.split(r"\n{2,}", text)
+        processed_blocks = []
+        for block in blocks:
+            if block.strip():
+                if block.startswith("<table>") and block.endswith("</table>"):
+                    processed_blocks.append(block)
+                elif re.match(r"^(?:(?:\*{3,})|(?:-{3,})|(?:_{3,}))$", block):
+                    processed_blocks.append(self.process_horizontal_rules(block))
+                else:
+                    processed_blocks.append(self.apply_rules(block.strip()))
+        return "\n\n".join(processed_blocks)
 
     # applies the regex rules as defined above to each line
     def apply_rules(self, block):
@@ -163,14 +175,6 @@ class MarkdownProcessor:
 
         return f'<img src="{self.escape_html(image_url)}" alt="{self.escape_html(alt_text)}">'
 
-    # Tables
-    def process_tables(self, text):
-        pass
-
-    # Horizontal rules
-    def process_horizontal_rules(self, text):
-        pass
-
     def escape_html(self, text):
         return (
             text.replace("&", "&amp;")
@@ -216,6 +220,10 @@ Here's a simple table:
 | Row 1, Col 1 | Row 1, Col 2 | Row 1, Col 3 |
 | Row 2, Col 1 | Row 2, Col 2 | Row 2, Col 3 |
 | Row 3, Col 1 | Row 3, Col 2 | Row 3, Col 3 |
+
+---
+
+And here's some text after a horizontal rule.
 
 """
     html_output = mdp.process(markdown_text)
