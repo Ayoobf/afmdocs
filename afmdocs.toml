@@ -1,5 +1,8 @@
+# AFMDocs Configuration
+
 site_name = "My AFMDocs Site"
-theme_dir = "themes/default"
 docs_dir = "docs"
 site_dir = "site"
-homepage = "homepage.md"
+theme_dir = "themes/default"
+
+# Add any other configuration options you need here

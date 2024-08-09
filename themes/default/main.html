@@ -3,19 +3,19 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title} - ${site_name}</title>
-        <link rel="stylesheet" href="/css/style.css">
+        <title>{{ config.site_name }}</title>
+        <link rel="stylesheet" href="{{ config.theme_dir }}/styles.css">
     </head>
     <body>
         <header>
-            <h1 style="text-align: center;">${site_name}</h1>
+            <h1>{{ config.site_name }}</h1>
             <!-- Add navigation here if needed -->
         </header>
         <main>
-            ${content}
+            {{ content | safe }}
         </main>
         <footer>
-            <p>&copy; ${site_name}</p>
+            <!-- Add footer content here -->
         </footer>
     </body>
 </html>
